@@ -1,4 +1,0 @@
-*.h5 filter=lfs diff=lfs merge=lfs -text
-*.txt filter=lfs diff=lfs merge=lfs -text
-*.pickel filter=lfs diff=lfs merge=lfs -text
-*.picklex filter=lfs diff=lfs merge=lfs -text
