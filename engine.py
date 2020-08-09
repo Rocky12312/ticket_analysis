@@ -1,5 +1,6 @@
 import io
 import os
+import time
 import dash
 import nltk
 import base64
@@ -40,20 +41,33 @@ bert_config_file = os.path.join(bert_ckpt_dir, "distilbert-base-uncased-config.j
 tokenizer = DistilBertTokenizer(vocab_file=os.path.join(bert_ckpt_dir, "distilbert-base-uncased-vocab.txt"))
 
 
-with open('words.pkl', 'rb') as handle:
+with open('lxkeywords.pkl', 'rb') as handle:
     words = pickle.load(handle)
 
-with open('classes/classes_main.pkl', 'rb') as handle:
+with open('classes/move_mainc1122.pkl', 'rb') as handle:
     classes_main = pickle.load(handle)
 
-with open('classes/subclasses_1.pkl', 'rb') as handle1:
+with open('classes/move1.pkl', 'rb') as handle1:
     subclasses1 = pickle.load(handle1)
 
-with open('classes/subclasses_2.pkl', 'rb') as handle2:
+with open('classes/move2.pkl', 'rb') as handle2:
     subclasses2 = pickle.load(handle2)
 
-with open('classes/subclasses_3.pkl', 'rb') as handle3:
+with open('classes/move3.pkl', 'rb') as handle3:
     subclasses3 = pickle.load(handle3)
+
+
+Access_Issue = ["Application Access"]
+Email = ["Lotus Notes Issue", "Shared Mailbox", "Outlook"]
+VDI = ["Citrix", "VmWare"]
+Account_Management = ["Password Reset", "Account Unlock"]
+Hardware = ["Workstation", "Printer"]
+O365 = ["Skype", "Lync", "One Drive", "Sharepoint"]
+ApplicationSoftware = ["Application Installation", "Software Installation", "Application", "ebiz Issue"]
+Browser = ["Internet Explorer", "Chrome", "Others Browser"]
+Network = ["Wi-Fi", "VPN", "RSA"]
+Mobility = ["MDM"]
+Office = ["MS Office"]
 
 
 def create_model_main(max_seq_len, classes):
@@ -104,17 +118,17 @@ def create_model(max_seq_len, classes):
     return model
 
 
-model_main = create_model_main(42, classes_main)
-model_main.load_weights("weights/main_classes.h5")
+model_main = create_model_main(60, classes_main)
+model_main.load_weights("weights/move_weights1122.h5")
 
 models1 = create_model(40, subclasses1)
-models1.load_weights("weights/subclass1.h5")
+models1.load_weights("weights/move1.h5")
 
 models2 = create_model(37, subclasses2)
-models2.load_weights("weights/subclass2.h5")
+models2.load_weights("weights/move2.h5")
 
 models3 = create_model(42, subclasses3)
-models3.load_weights("weights/subclass3.h5")
+models3.load_weights("weights/move3.h5")
 
 
 logging.basicConfig(filename="flask.log", level=logging.DEBUG, format="%(asctime)s %(levelname)s %(name)s %(threadName)s:%(message)s")
@@ -240,37 +254,218 @@ def form():
 @server.route('/transform', methods=["POST"])
 def transform_view():
     if request.method == 'POST':
+        start_time = time.time()
         df = pd.read_csv(request.files.get('data_file'))
         #df = df.dropna(subset=["Description"], axis=0)
+        df["predicted_category"] = "0"
+        df["predicted_subcategory"] = "0"
+        df.reset_index(inplace=True, drop=True)
         df = df.dropna()
         df.reset_index(inplace=True, drop=True)
         df_filtered = removing_extrawords(df)
+        #df_filtered = df
+        print(len(df_filtered))
         df_filtered = df_filtered.dropna()
+        print(len(df_filtered))
         df_filtered.reset_index(inplace=True, drop=True)
-        list_cat = []
-        list_subcat = []
         for rec in range(len(df_filtered)):
             a = transform(df_filtered["des"][rec], 42)
             cat = model_main.predict(a).argmax(axis=-1)
-            list_cat.append(classes_main[cat[0]])
-            if classes_main[cat[0]] in ["Access Issue", "Email", "VDI"]:
+            #list_cat.append(classes_main[cat[0]])
+            df_filtered["predicted_category"][rec] = classes_main[cat[0]]
+            if classes_main[cat[0]] in ["Access Issue", "Email", "VDI", "Browser"]:
                 a1 = transform(df_filtered["des"][rec], 40)
-                sub_cat = models1.predict(a1).argmax(axis=-1)
-                list_subcat.append(subclasses1[sub_cat[0]])
+                sub_cats_all = models1.predict(a1)#.argmax(axis=-1)
+                sub_cat = sub_cats_all.argmax(axis=-1)
+                sub_category = subclasses1[sub_cat[0]]
+                ll = []
+                for i in sub_cats_all:
+                    ll = i
+                if classes_main[cat[0]] == "Access Issue":
+                    if sub_category in Access_Issue:
+                        #list_subcat.append(sub_category)
+                        df_filtered["predicted_subcategory"][rec] = sub_category
+                    else:
+                        ll[sub_cat[0]] = 0
+                        for j in range(7):
+                            al = ll.argmax(axis=-1)
+                            if subclasses1[al] in Access_Issue:
+                                #list_subcat.append(subclasses1[al])
+                                df_filtered["predicted_subcategory"][rec] = subclasses1[al]
+                                break
+                            else:
+                                ll[al] = 0
+                elif classes_main[cat[0]] == "Browser":
+                    if sub_category in Access_Issue:
+                        #list_subcat.append(sub_category)
+                        df_filtered["predicted_subcategory"][rec] = sub_category
+                    else:
+                        ll[sub_cat[0]] = 0
+                        for j in range(7):
+                            al = ll.argmax(axis=-1)
+                            if subclasses1[al] in Browser:
+                                #list_subcat.append(subclasses1[al])
+                                df_filtered["predicted_subcategory"][rec] = subclasses1[al]
+                                break
+                            else:
+                                ll[al] = 0
+                        #ll.clear()
+                elif classes_main[cat[0]] == "Email":
+                    if sub_category in Email:
+                        #list_subcat.append(sub_category)
+                        df_filtered["predicted_subcategory"][rec] = sub_category
+                    else:
+                        ll[sub_cat[0]] = 0
+                        for j in range(7):
+                            al = ll.argmax(axis=-1)
+                            if subclasses1[al] in Email:
+                                #list_subcat.append(subclasses1[al])
+                                df_filtered["predicted_subcategory"][rec] = subclasses1[al]
+                                break
+                            else:
+                                ll[al] = 0
+                        #ll.clear()
+                else:
+                    if sub_category in VDI:
+                        #list_subcat.append(sub_category)
+                        df_filtered["predicted_subcategory"][rec] = sub_category
+                    else:
+                        ll[sub_cat[0]] = 0
+                        for j in range(7):
+                            al = ll.argmax(axis=-1)
+                            if subclasses1[al] in VDI:
+                                #list_subcat.append(subclasses1[al])
+                                df_filtered["predicted_subcategory"][rec] = subclasses1[al]
+                                break
+                            else:
+                                ll[al] = 0
+                        #ll.clear()
             elif classes_main[cat[0]] in ["Account Management", "O365", "Hardware"]:
                 a2 = transform(df_filtered["des"][rec], 37)
-                sub_cat = models2.predict(a2).argmax(axis=-1)
-                list_subcat.append(subclasses2[sub_cat[0]])
-            elif classes_main[cat[0]] in ["ApplicationSoftware", "Network", "Storage", "Mobility", "Office"]:
+                sub_cats_all = models2.predict(a2)#.argmax(axis=-1)
+                sub_cat = sub_cats_all.argmax(axis=-1)
+                sub_category = subclasses2[sub_cat[0]]
+                mm = []
+                for i in sub_cats_all:
+                    mm = i
+                if classes_main[cat[0]] == "Account Management":
+                    if sub_category in Account_Management:
+                        #list_subcat.append(sub_category)
+                        df_filtered["predicted_subcategory"][rec] = sub_category
+                    else:
+                        mm[sub_cat[0]] = 0
+                        for j in range(12):
+                            bl = mm.argmax(axis=-1)
+                            if subclasses2[bl] in Account_Management:
+                                #list_subcat.append(subclasses2[bl])
+                                df_filtered["predicted_subcategory"][rec] = subclasses2[bl]
+                                break
+                            else:
+                                mm[bl] = 0
+                        #mm.clear()
+                elif classes_main[cat[0]] == "O365":
+                    if sub_category in O365:
+                        #list_subcat.append(sub_category)
+                        df_filtered["predicted_subcategory"][rec] = sub_category
+                    else:
+                        mm[sub_cat[0]] = 0
+                        for j in range(12):
+                            bl = mm.argmax(axis=-1)
+                            if subclasses2[bl] in O365:
+                                #list_subcat.append(subclasses2[bl])
+                                df_filtered["predicted_subcategory"][rec] = subclasses2[bl]
+                                break
+                            else:
+                                mm[bl] = 0
+                        #mm.clear()
+                else:
+                    if sub_category in Hardware:
+                        #list_subcat.append(sub_category)
+                        df_filtered["predicted_subcategory"][rec] = sub_category
+                    else:
+                        mm[sub_cat[0]] = 0
+                        for j in range(12):
+                            bl = mm.argmax(axis=-1)
+                            if subclasses2[bl] in Hardware:
+                                #list_subcat.append(subclasses2[bl])
+                                df_filtered["predicted_subcategory"][rec] = subclasses2[bl]
+                                break
+                            else:
+                                mm[bl] = 0
+                        #mm.clear()
+            elif classes_main[cat[0]] in ["ApplicationSoftware", "Network", "Mobility", "Office"]:
                 a3 = transform(df_filtered["des"][rec], 42)
-                sub_cat = models3.predict(a3).argmax(axis=-1)
-                list_subcat.append(subclasses3[sub_cat[0]])
+                sub_cats_all = models3.predict(a3)#.argmax(axis=-1)
+                sub_cat = sub_cats_all.argmax(axis=-1)
+                sub_category = subclasses3[sub_cat[0]]
+                nn = []
+                for i in sub_cats_all:
+                    nn = i
+                if classes_main[cat[0]] == "ApplicationSoftware":
+                    if sub_category in ApplicationSoftware:
+                        #list_subcat.append(sub_category)
+                        df_filtered["predicted_subcategory"][rec] = sub_category
+                    else:
+                        nn[sub_cat[0]] = 0
+                        for j in range(11):
+                            cl = nn.argmax(axis=-1)
+                            if subclasses3[cl] in ApplicationSoftware:
+                                #list_subcat.append(subclasses3[cl])
+                                df_filtered["predicted_subcategory"][rec] = subclasses3[cl]
+                                break
+                            else:
+                                nn[cl] = 0
+                        #nn.clear()
+                elif classes_main[cat[0]] == "Network":
+                    if sub_category in Network:
+                        #list_subcat.append(sub_category)
+                        df_filtered["predicted_subcategory"][rec] = sub_category
+                    else:
+                        nn[sub_cat[0]] = 0
+                        for j in range(11):
+                            cl = nn.argmax(axis=-1)
+                            if subclasses3[cl] in Network:
+                                #list_subcat.append(subclasses3[cl])
+                                df_filtered["predicted_subcategory"][rec] = subclasses3[cl]
+                                break
+                            else:
+                                nn[cl] = 0
+                        #nn.clear()
+                elif classes_main[cat[0]] == "Mobility":
+                    if sub_category in Mobility:
+                        #list_subcat.append(sub_category)
+                        df_filtered["predicted_subcategory"][rec] = sub_category
+                    else:
+                        nn[sub_cat[0]] = 0
+                        for j in range(11):
+                            cl = nn.argmax(axis=-1)
+                            if subclasses3[cl] in Mobility:
+                                #list_subcat.append(subclasses3[cl])
+                                df_filtered["predicted_subcategory"][rec] = subclasses3[cl]
+                                break
+                            else:
+                                nn[cl] = 0
+                        #nn.clear()
+                else:
+                    if sub_category in Office:
+                        #list_subcat.append(sub_category)
+                        df_filtered["predicted_subcategory"][rec] = sub_category
+                    else:
+                        nn[sub_cat[0]] = 0
+                        for j in range(11):
+                            cl = nn.argmax(axis=-1)
+                            if subclasses3[cl] in Office:
+                                #list_subcat.append(subclasses3[cl])
+                                df_filtered["predicted_subcategory"][rec] = subclasses3[cl]
+                                break
+                            else:
+                                nn[cl] = 0
+                        #nn.clear()
             else:
-                list_subcat.append("Left")
-
-        df_filtered["predicted_category"] = list_cat
-        df_filtered["predicted_subcategory"] = list_subcat
-        df_filtered.drop("des", axis=1, inplace=True)
+                #list_subcat.append("Left")
+                df_filtered["predicted_subcategory"][rec] = "left"
+        print("--- %s seconds ---" % (time.time() - start_time))
+        #df_filtered.drop("des", axis=1, inplace=True)
         response = make_response(df_filtered.to_csv())
         response.headers["Content-Disposition"] = "attachment; filename=result.csv"
         response.headers["Content-Type"] = "text/csv"
@@ -279,4 +474,4 @@ def transform_view():
 
 
 if __name__ == "__main__":
-    server.run(debug=True, host="0.0.0.0", port=4400)
+    server.run(debug=True, host="0.0.0.0", port=4500)
