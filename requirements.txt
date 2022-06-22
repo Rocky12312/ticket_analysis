@@ -6,7 +6,7 @@ itsdangerous==1.1.0
 Jinja2==2.11.2
 Keras==2.3.1
 make-response==1
-numpy==1.18.5
+numpy==1.22.0
 pandas==1.0.4
 pytz==2020.1
 PyYAML==5.3.1
